@@ -33,7 +33,10 @@ class Comments:
 
         self._send_notification(notify)
         comments_raw, channel_id = self.get_yt_comments()
-        self.format_comments(comments_raw)
+        if comments_raw:
+            self.format_comments(comments_raw)
+        else:
+            self.comments_format = []
 
         self.json_data = {
             "youtube_id": self.youtube_id,
@@ -167,6 +170,9 @@ class Comments:
 
         self.build_json()
         es_comments = self.get_es_comments()
+
+        if not self.comments_format:
+            return
 
         if not self.comments_format and es_comments["comment_comments"]:
             # don't overwrite comments in es
