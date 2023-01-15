@@ -381,6 +381,17 @@ class YoutubeChannel(YouTubeItem):
 
         return all_youtube_ids
 
+    def get_channel_videos(self):
+        """get all videos from channel"""
+        data = {
+            "query": {
+                "term": {"channel.channel_id": {"value": self.youtube_id}}
+            },
+            "_source": ["youtube_id", "vid_type"],
+        }
+        all_videos = IndexPaginate("ta_video", data).get_results()
+        return all_videos
+
     def get_all_playlists(self):
         """get all playlists owned by this channel"""
         url = (
@@ -392,14 +403,16 @@ class YoutubeChannel(YouTubeItem):
         all_entries = [(i["id"], i["title"]) for i in playlists["entries"]]
         self.all_playlists = all_entries
 
-    def get_indexed_playlists(self):
+    def get_indexed_playlists(self, active_only=False):
         """get all indexed playlists from channel"""
-        data = {
-            "query": {
-                "term": {"playlist_channel_id": {"value": self.youtube_id}}
-            },
-            "sort": [{"playlist_channel.keyword": {"order": "desc"}}],
-        }
+        must_list = [
+            {"term": {"playlist_channel_id": {"value": self.youtube_id}}}
+        ]
+        if active_only:
+            must_list.append({"term": {"playlist_active": {"value": True}}})
+
+        data = {"query": {"bool": {"must": must_list}}}
+
         all_playlists = IndexPaginate("ta_playlist", data).get_results()
         return all_playlists
 

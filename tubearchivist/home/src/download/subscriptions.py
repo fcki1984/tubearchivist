@@ -10,6 +10,7 @@ from home.src.download.yt_dlp_base import YtWrap
 from home.src.es.connect import IndexPaginate
 from home.src.index.channel import YoutubeChannel
 from home.src.index.playlist import YoutubePlaylist
+from home.src.index.video_constants import VideoTypeEnum
 from home.src.ta.config import AppConfig
 from home.src.ta.ta_redis import RedisArchivist
 
@@ -35,22 +36,63 @@ class ChannelSubscription:
 
         return all_channels
 
-    def get_last_youtube_videos(self, channel_id, limit=True):
+    def get_last_youtube_videos(
+        self, channel_id, limit=True, query_filter=VideoTypeEnum.UNKNOWN
+    ):
         """get a list of last videos from channel"""
-        obs = {
-            "skip_download": True,
-            "extract_flat": True,
-        }
-        if limit:
-            obs["playlistend"] = self.config["subscriptions"]["channel_size"]
+        queries = self._build_queries(query_filter, limit)
 
-        url = f"https://www.youtube.com/channel/{channel_id}/videos"
-        channel = YtWrap(obs, self.config).extract(url)
-        if not channel:
-            return False
+        last_videos = []
 
-        last_videos = [(i["id"], i["title"]) for i in channel["entries"]]
+        for vid_type, limit_amount in queries:
+            obs = {
+                "skip_download": True,
+                "extract_flat": True,
+            }
+            if limit:
+                obs["playlistend"] = limit_amount
+
+            path = vid_type.value
+            channel = YtWrap(obs, self.config).extract(
+                f"https://www.youtube.com/channel/{channel_id}/{path}"
+            )
+            if not channel:
+                continue
+            last_videos.extend(
+                [(i["id"], i["title"], vid_type) for i in channel["entries"]]
+            )
+
         return last_videos
+
+    def _build_queries(self, query_filter, limit):
+        """build query list for vid_type"""
+        limit_map = {
+            "videos": self.config["subscriptions"]["channel_size"],
+            "streams": self.config["subscriptions"]["live_channel_size"],
+            "shorts": self.config["subscriptions"]["shorts_channel_size"],
+        }
+
+        queries = []
+
+        if query_filter and query_filter.value != "unknown":
+            if limit:
+                query_limit = limit_map.get(query_filter.value)
+            else:
+                query_limit = False
+
+            queries.append((query_filter, query_limit))
+
+            return queries
+
+        for query_item, default_limit in limit_map.items():
+            if limit:
+                query_limit = default_limit
+            else:
+                query_limit = False
+
+            queries.append((VideoTypeEnum(query_item), query_limit))
+
+        return queries
 
     def find_missing(self):
         """add missing videos from subscribed channels to pending"""
@@ -67,9 +109,9 @@ class ChannelSubscription:
             last_videos = self.get_last_youtube_videos(channel_id)
 
             if last_videos:
-                for video in last_videos:
-                    if video[0] not in pending.to_skip:
-                        missing_videos.append(video[0])
+                for video_id, _, vid_type in last_videos:
+                    if video_id not in pending.to_skip:
+                        missing_videos.append((video_id, vid_type))
             # notify
             message = {
                 "status": "message:rescan",

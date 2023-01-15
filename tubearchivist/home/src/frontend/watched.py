@@ -6,7 +6,7 @@ functionality:
 from datetime import datetime
 
 from home.src.es.connect import ElasticWrap
-from home.src.ta.helper import UrlListParser
+from home.src.ta.urlparser import Parser
 
 
 class WatchState:
@@ -20,6 +20,7 @@ class WatchState:
 
     def change(self):
         """change watched state of item(s)"""
+        print(f"{self.youtube_id}: change watched state to {self.is_watched}")
         url_type = self._dedect_type()
         if url_type == "video":
             self.change_vid_state()
@@ -33,8 +34,7 @@ class WatchState:
 
     def _dedect_type(self):
         """find youtube id type"""
-        print(self.youtube_id)
-        url_process = UrlListParser(self.youtube_id).process_list()
+        url_process = Parser(self.youtube_id).parse()
         url_type = url_process[0]["type"]
         return url_type
 

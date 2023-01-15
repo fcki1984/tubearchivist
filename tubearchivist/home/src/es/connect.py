@@ -3,6 +3,7 @@ functionality:
 - wrapper around requests to call elastic search
 - reusable search_after to extract total index
 """
+# pylint: disable=missing-timeout
 
 import json
 
@@ -34,9 +35,11 @@ class ElasticWrap:
     def get(self, data=False):
         """get data from es"""
         if data:
-            response = requests.get(self.url, json=data, auth=self.auth)
+            response = requests.get(
+                self.url, json=data, auth=self.auth, timeout=10
+            )
         else:
-            response = requests.get(self.url, auth=self.auth)
+            response = requests.get(self.url, auth=self.auth, timeout=10)
         if not response.ok:
             print(response.text)
 

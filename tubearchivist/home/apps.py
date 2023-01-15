@@ -27,6 +27,7 @@ class StartupCheck:
     def run(self):
         """run all startup checks"""
         print("run startup checks")
+        self.set_lock()
         self.es_version_check()
         self.release_lock()
         self.sync_redis_state()
@@ -36,14 +37,20 @@ class StartupCheck:
         clear_dl_cache(self.config_handler.config)
         self.snapshot_check()
         self.ta_version_check()
-        self.set_has_run()
+        self.es_set_vid_type()
+        self.expire_lock()
 
     def get_has_run(self):
         """validate if check has already executed"""
         return self.redis_con.get_message("startup_check")
 
-    def set_has_run(self):
+    def set_lock(self):
+        """set lock to avoid executing once per thread"""
+        self.redis_con.set_message("startup_check", message={"status": True})
+
+    def expire_lock(self):
         """startup checks run"""
+        print("startup checks completed")
         message = {"status": True}
         self.redis_con.set_message("startup_check", message, expire=120)
 
@@ -74,7 +81,6 @@ class StartupCheck:
     def release_lock(self):
         """make sure there are no leftover locks set in redis"""
         all_locks = [
-            "startup_check",
             "manual_import",
             "downloading",
             "dl_queue",
@@ -125,6 +131,33 @@ class StartupCheck:
     def ta_version_check(self):
         """remove key if updated now"""
         ReleaseVersion().is_updated()
+
+    def es_set_vid_type(self):
+        """
+        update path 0.3.0 to 0.3.1, set default vid_type to video
+        fix unidentified vids in unstable
+        """
+        index_list = ["ta_video", "ta_download"]
+        data = {
+            "query": {
+                "bool": {
+                    "should": [
+                        {
+                            "bool": {
+                                "must_not": [{"exists": {"field": "vid_type"}}]
+                            }
+                        },
+                        {"term": {"vid_type": {"value": "unknown"}}},
+                    ]
+                }
+            },
+            "script": {"source": "ctx._source['vid_type'] = 'videos'"},
+        }
+
+        for index_name in index_list:
+            path = f"{index_name}/_update_by_query"
+            response, _ = ElasticWrap(path).post(data=data)
+            print(f"{index_name} vid_type index update ran: {response}")
 
 
 class HomeConfig(AppConfig):
