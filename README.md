@@ -66,9 +66,9 @@ There's dedicated user-contributed install steps under [docs/Installation.md](./
 
 For minimal system requirements, the Tube Archivist stack needs around 2GB of available memory for a small testing setup and around 4GB of available memory for a mid to large sized installation. Minimal with dual core with 4 threads, better quad core plus.  
 
-Note for arm64 hosts: The Tube Archivist container is multi arch, so is Elasticsearch. RedisJSON doesn't offer arm builds, but you can use the image `bbilly1/rejson`, an unofficial rebuild for arm64.
-
 This project requires docker. Ensure it is installed and running on your system.
+
+Note for **arm64**: Tube Archivist is a multi arch container, same for redis. For Elasitc Search use the official image for arm64 support. Other architectures are not supported.
 
 Save the [docker-compose.yml](./docker-compose.yml) file from this reposity somewhere permanent on your system, keeping it named `docker-compose.yml`. You'll need to refer to it whenever starting this application.
 
@@ -153,11 +153,19 @@ Wildcards "*" can not be used for the Access-Control-Allow-Origin header. If the
 
 Use `bbilly1/tubearchivist-es` to automatically get the recommended version, or use the official image with the version tag in the docker-compose file.
 
+Use official Elastic Search for **arm64**.  
+
 Stores video meta data and makes everything searchable. Also keeps track of the download queue.
   - Needs to be accessible over the default port `9200`
   - Needs a volume at **/usr/share/elasticsearch/data** to store data
 
 Follow the [documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html) for additional installation details.
+
+### Elasticsearch on a custom port
+Should you need to change the port for Elasticsearch to for example *9500*, follow these steps:
+- Set the environment variable `http.port=9500` to the ES container
+- Change the *expose* value for the ES container to match your port number
+- For the Tube Archivist container, change the *ES_URL* environment variable, e.g. `ES_URL=http://archivist-es:9500`
 
 ### Redis JSON
 Functions as a cache and temporary link between the application and the file system. Used to store and display messages and configuration variables.
@@ -229,7 +237,7 @@ We have come far, nonetheless we are not short of ideas on how to improve and ex
 - [ ] Show total video downloaded vs total videos available in channel
 - [ ] Add statistics of index
 - [ ] Download speed schedule ([#198](https://github.com/tubearchivist/tubearchivist/issues/198))
-- [ ] Auto ignore videos by keyword ([#163](https://github.com/tubearchivist/tubearchivist/issues/163))
+- [ ] Download or Ignore videos by keyword ([#163](https://github.com/tubearchivist/tubearchivist/issues/163))
 - [ ] Custom searchable notes to videos, channels, playlists ([#144](https://github.com/tubearchivist/tubearchivist/issues/144))
 
 Implemented:
@@ -269,6 +277,18 @@ Second best way to support the development is to provide for caffeinated beverag
 * [Paypal.me](https://paypal.me/bbilly1) for a one time coffee
 * [Paypal Subscription](https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-03770005GR991451KMFGVPMQ) for a monthly coffee
 * [ko-fi.com](https://ko-fi.com/bbilly1) for an alternative platform
+
+
+## Notable mentions
+This is a selection of places where this project has been featured on reddit, in the news, blogs or any other online media. Sorted by newest on the top.
+* **console.substack.com**: Interview With Simon of Tube Archivist, [2023-01-29] [[link](https://console.substack.com/p/console-142#%C2%A7interview-with-simon-of-tube-archivist)]
+* **reddit.com**: Tube Archivist v0.3.0 - Now Archiving Comments, [2022-12-02] [[link](https://www.reddit.com/r/selfhosted/comments/zaonzp/tube_archivist_v030_now_archiving_comments/)]
+* **reddit.com**: Tube Archivist v0.2 - Now with Full Text Search, [2022-07-24] [[link](https://www.reddit.com/r/selfhosted/comments/w6jfa1/tube_archivist_v02_now_with_full_text_search/)]
+* **noted.lol**: How I Control What Media My Kids Watch Using Tube Archivist, [2022-03-27] [[link](https://noted.lol/how-i-control-what-media-my-kids-watch-using-tube-archivist/)]
+* **thehomelab.wiki**: Tube Archivist - A Youtube-DL Alternative on Steroids, [2022-01-27] [[link](https://thehomelab.wiki/books/news/page/tube-archivist-a-youtube-dl-alternative-on-steroids)]
+* **reddit.com**: Celebrating TubeArchivist v0.1, [2022-01-09] [[link](https://www.reddit.com/r/selfhosted/comments/rzh084/celebrating_tubearchivist_v01/)]
+* **linuxunplugged.com**: Pick: tubearchivist — Your self-hosted YouTube media server, [2021-09-11] [[link](https://linuxunplugged.com/425)] and [2021-10-05] [[link](https://linuxunplugged.com/426)]
+* **reddit.com**: Introducing Tube Archivist, your self hosted Youtube media server, [2021-09-12] [[link](https://www.reddit.com/r/selfhosted/comments/pmj07b/introducing_tube_archivist_your_self_hosted/)]
 
 
 ## Sponsor

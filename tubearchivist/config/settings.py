@@ -32,7 +32,9 @@ SECRET_KEY = PW_HASH.hexdigest()
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = bool(environ.get("DJANGO_DEBUG"))
 
-ALLOWED_HOSTS = [i.strip() for i in environ.get("TA_HOST").split()]
+ALLOWED_HOSTS = []
+if environ.get("TA_HOST"):
+    ALLOWED_HOSTS = [i.strip() for i in environ.get("TA_HOST").split()]
 
 CSRF_TRUSTED_ORIGINS = []
 for host in ALLOWED_HOSTS:
@@ -58,6 +60,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "api",
+    "config",
 ]
 
 MIDDLEWARE = [
@@ -262,4 +265,4 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 
 # TA application settings
 TA_UPSTREAM = "https://github.com/tubearchivist/tubearchivist"
-TA_VERSION = "v0.3.2"
+TA_VERSION = "v0.3.3"

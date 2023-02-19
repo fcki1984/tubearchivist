@@ -10,7 +10,6 @@ import json
 import os
 
 from celery import Celery, shared_task
-from home.apps import StartupCheck
 from home.src.download.queue import PendingList
 from home.src.download.subscriptions import (
     ChannelSubscription,
@@ -112,9 +111,10 @@ def download_pending():
 def download_single(pending_video):
     """start download single video now"""
     queue = RedisQueue(queue_name="dl_queue")
+
     to_add = {
         "youtube_id": pending_video["youtube_id"],
-        "vid_type": pending_video["vid_type"],
+        "vid_type": pending_video.get("vid_type", VideoTypeEnum.VIDEOS.value),
     }
     queue.add_priority(json.dumps(to_add))
     print(f"Added to queue with priority: {to_add}")
@@ -228,7 +228,7 @@ def kill_dl(task_id):
     _ = RedisArchivist().del_message("dl_queue_id")
     RedisQueue(queue_name="dl_queue").clear()
 
-    clear_dl_cache(CONFIG)
+    _ = clear_dl_cache(CONFIG)
 
     # notify
     mess_dict = {
@@ -313,6 +313,5 @@ def version_check():
     ReleaseVersion().check()
 
 
-# load new defaults then start the schedule here
-StartupCheck().sync_redis_state()
+# start schedule here
 app.conf.beat_schedule = ScheduleBuilder().build_schedule()

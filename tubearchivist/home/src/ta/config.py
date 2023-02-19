@@ -137,7 +137,7 @@ class AppConfig:
             config = self.get_config()
             config["scheduler"]["version_check"] = self._build_rand_daily()
             RedisArchivist().set_message("config", config)
-            return
+            return False
 
         needs_update = False
 
@@ -159,6 +159,8 @@ class AppConfig:
 
         if needs_update:
             RedisArchivist().set_message("config", redis_config)
+
+        return needs_update
 
 
 class ScheduleBuilder:
@@ -263,6 +265,8 @@ class ScheduleBuilder:
 
     def build_schedule(self):
         """build schedule dict as expected by app.conf.beat_schedule"""
+        AppConfig().load_new_defaults()
+        self.config = AppConfig().config
         schedule_dict = {}
 
         for schedule_item in self.SCHEDULES:
@@ -342,11 +346,13 @@ class ReleaseVersion:
         """check if update happened in the mean time"""
         message = self.get_update()
         if not message:
-            return
+            return False
 
         if self._parse_version(message.get("version")) == self.local_version:
-            print(f"[{self.local_version}]: update completed")
             RedisArchivist().del_message(self.NEW_KEY)
+            return settings.TA_VERSION
+
+        return False
 
     def get_update(self):
         """return new version dict if available"""
