@@ -257,11 +257,7 @@ class Reindex(ReindexBase):
 
         # read current state
         video.get_from_es()
-        player = video.json_data["player"]
-        date_downloaded = video.json_data["date_downloaded"]
-        channel_dict = video.json_data["channel"]
-        playlist = video.json_data.get("playlist")
-        subtitles = video.json_data.get("subtitles")
+        es_meta = video.json_data.copy()
 
         # get new
         video.build_json()
@@ -269,17 +265,21 @@ class Reindex(ReindexBase):
             video.deactivate()
             return
 
-        video.delete_subtitles(subtitles=subtitles)
+        video.delete_subtitles(subtitles=es_meta.get("subtitles"))
         video.check_subtitles()
 
         # add back
-        video.json_data["player"] = player
-        video.json_data["date_downloaded"] = date_downloaded
-        video.json_data["channel"] = channel_dict
-        if playlist:
-            video.json_data["playlist"] = playlist
+        video.json_data["player"] = es_meta.get("player")
+        video.json_data["date_downloaded"] = es_meta.get("date_downloaded")
+        video.json_data["channel"] = es_meta.get("channel")
+        if es_meta.get("playlist"):
+            video.json_data["playlist"] = es_meta.get("playlist")
 
         video.upload_to_es()
+        if es_meta.get("media_url") != video.json_data["media_url"]:
+            self._rename_media_file(
+                es_meta.get("media_url"), video.json_data["media_url"]
+            )
 
         thumb_handler = ThumbManager(youtube_id)
         thumb_handler.delete_video_thumb()
@@ -288,6 +288,14 @@ class Reindex(ReindexBase):
         Comments(youtube_id, config=self.config).reindex_comments()
 
         return
+
+    def _rename_media_file(self, media_url_is, media_url_should):
+        """handle title change"""
+        print(f"[reindex] fix media_url {media_url_is} to {media_url_should}")
+        videos = self.config["application"]["videos"]
+        old_path = os.path.join(videos, media_url_is)
+        new_path = os.path.join(videos, media_url_should)
+        os.rename(old_path, new_path)
 
     @staticmethod
     def _reindex_single_channel(channel_id):
