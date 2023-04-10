@@ -131,13 +131,12 @@ class DownloadPostProcess:
         total_channel = len(self.download.channels)
         total_playlist = len(all_channel_playlist)
 
-        message = [f"Validate Playlists {id_p + 1}/{total_playlist}"]
-        title = f"Post Processing Channels: {id_c + 1}/{total_channel}"
+        message = [
+            f"Post Processing Channels: {id_c}/{total_channel}",
+            f"Validate Playlists {id_p + 1}/{total_playlist}",
+        ]
         progress = (id_c + 1) / total_channel
-
-        self.download.task.send_progress(
-            message, progress=progress, title=title
-        )
+        self.download.task.send_progress(message, progress=progress)
 
     def get_comments(self):
         """get comments from youtube"""
@@ -189,7 +188,12 @@ class VideoDownloader:
                 continue
 
             if self.task:
-                self.task.send_progress(["Add video metadata to index."])
+                self.task.send_progress(
+                    [
+                        f"Processing video {youtube_id}",
+                        "Add video metadata to index.",
+                    ]
+                )
 
             vid_dict = index_new_video(
                 youtube_id,
@@ -200,7 +204,12 @@ class VideoDownloader:
             self.videos.add(vid_dict["youtube_id"])
 
             if self.task:
-                self.task.send_progress(["Move downloaded file to archive."])
+                self.task.send_progress(
+                    [
+                        f"Processing video {youtube_id}",
+                        "Move downloaded file to archive.",
+                    ]
+                )
 
             self.move_to_archive(vid_dict)
 

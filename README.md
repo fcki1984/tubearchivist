@@ -11,7 +11,7 @@
 ![home screenshot](assets/tube-archivist-screenshot-home.png?raw=true "Tube Archivist Home")
 
 ## Table of contents:
-* [Docs](https://docs.tubearchivist.com/) with [FAQ](https://docs.tubearchivist.com/faq/), [API endpoints](https://github.com/tubearchivist/tubearchivist/tree/master/tubearchivist/api)
+* [Docs](https://docs.tubearchivist.com/) with [FAQ](https://docs.tubearchivist.com/faq/), and API documentation
 * [Core functionality](#core-functionality)
 * [Resources](#resources)
 * [Installing](#installing)
@@ -52,7 +52,7 @@ Take a look at the example [docker-compose.yml](https://github.com/tubearchivist
 **TubeArchivist**:  
 | Environment Var | Value |  |
 | ----------- | ----------- | ----------- |
-| TA_HOST | Server IP or hostname, without port, without protocol | Required |
+| TA_HOST | Server IP or hostname | Required |
 | TA_USERNAME | Initial username when logging into TA | Required |
 | TA_PASSWORD | Initial password when logging into TA | Required |
 | ELASTIC_PASSWORD | Password for ElasticSearch | Required |
