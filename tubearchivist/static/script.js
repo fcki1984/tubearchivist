@@ -1201,7 +1201,7 @@ function writeComments(allComments) {
 
 function createReplyButton(replyId, totalReplies) {
   let replyButton = document.createElement('button');
-  replyButton.innerHTML = `<span id="toggle-icon">+</span> ${totalReplies} replies`;
+  replyButton.innerHTML = `<span id="toggle-icon">▼</span> ${totalReplies} replies`;
   replyButton.setAttribute('data-id', replyId);
   replyButton.setAttribute('onclick', 'toggleCommentReplies(this)');
   return replyButton;
@@ -1213,10 +1213,10 @@ function toggleCommentReplies(button) {
 
   if (state === 'none' || state === '') {
     document.getElementById(commentReplyId).style.display = 'block';
-    button.querySelector('#toggle-icon').innerHTML = '-';
+    button.querySelector('#toggle-icon').innerHTML = '▲';
   } else {
     document.getElementById(commentReplyId).style.display = 'none';
-    button.querySelector('#toggle-icon').innerHTML = '+';
+    button.querySelector('#toggle-icon').innerHTML = '▼';
   }
 }
 
@@ -1318,9 +1318,9 @@ function getCookie(c_name) {
 
 // animations
 
-function textReveal() {
-  let textBox = document.getElementById('text-reveal');
-  let button = document.getElementById('text-reveal-button');
+function textReveal(button) {
+  let revealBox = button.parentElement.parentElement;
+  let textBox = revealBox.querySelector('#text-reveal');
   let textBoxHeight = textBox.style.height;
   if (textBoxHeight === 'unset') {
     textBox.style.height = '0px';

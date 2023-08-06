@@ -81,13 +81,16 @@ class Command(BaseCommand):
                 _, status_code = ElasticWrap("/").get(
                     timeout=1, print_error=False
                 )
-            except requests.exceptions.ConnectionError:
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+            ):
                 sleep(5)
                 continue
 
             if status_code and status_code == 200:
-                path = "_cluster/health?wait_for_status=yellow&timeout=30s"
-                _, _ = ElasticWrap(path).get()
+                path = "_cluster/health?wait_for_status=yellow&timeout=60s"
+                _, _ = ElasticWrap(path).get(timeout=60)
                 self.stdout.write(
                     self.style.SUCCESS("    ✓ ES connection established")
                 )

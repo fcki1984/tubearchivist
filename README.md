@@ -1,15 +1,12 @@
-![Tube Archivist](assets/tube-archivist-banner.jpg?raw=true "Tube Archivist Banner")  
+![Tube Archivist](assets/tube-archivist-front.jpg?raw=true "Tube Archivist Banner")  
+[*more screenshots and video*](SHOWCASE.MD)
 
-<h1 align="center">Your self hosted YouTube media server</h1>
 <div align="center">
 <a href="https://github.com/bbilly1/tilefy" target="_blank"><img src="https://tiles.tilefy.me/t/tubearchivist-docker.png" alt="tubearchivist-docker" title="Tube Archivist Docker Pulls" height="50" width="190"/></a>
 <a href="https://github.com/bbilly1/tilefy" target="_blank"><img src="https://tiles.tilefy.me/t/tubearchivist-github-star.png" alt="tubearchivist-github-star" title="Tube Archivist GitHub Stars" height="50" width="190"/></a>
 <a href="https://github.com/bbilly1/tilefy" target="_blank"><img src="https://tiles.tilefy.me/t/tubearchivist-github-forks.png" alt="tubearchivist-github-forks" title="Tube Archivist GitHub Forks" height="50" width="190"/></a>
 <a href="https://www.tubearchivist.com/discord" target="_blank"><img src="https://tiles.tilefy.me/t/tubearchivist-discord.png" alt="tubearchivist-discord" title="TA Discord Server Members" height="50" width="190"/></a>
 </div>
-
-![home screenshot](assets/tube-archivist-screenshot-home.png?raw=true "Tube Archivist Home")
-[*more screenshots and video*](SHOWCASE.MD)
 
 ## Table of contents:
 * [Docs](https://docs.tubearchivist.com/) with [FAQ](https://docs.tubearchivist.com/faq/), and API documentation
@@ -135,7 +132,7 @@ Similar to that, TubeArchivist will become all sorts of messed up when running o
 ## Known limitations
 - Video files created by Tube Archivist need to be playable in your browser of choice. Not every codec is compatible with every browser and might require some testing with format selection. 
 - Every limitation of **yt-dlp** will also be present in Tube Archivist. If **yt-dlp** can't download or extract a video for any reason, Tube Archivist won't be able to either.
-- There is currently no flexibility in naming of the media files.
+- There is no flexibility in naming of the media files.
 
 ## Roadmap
 We have come far, nonetheless we are not short of ideas on how to improve and extend this project. Issues waiting for you to be tackled in no particular order:
@@ -143,7 +140,6 @@ We have come far, nonetheless we are not short of ideas on how to improve and ex
 - [ ] User roles
 - [ ] Podcast mode to serve channel as mp3
 - [ ] Implement [PyFilesystem](https://github.com/PyFilesystem/pyfilesystem2) for flexible video storage
-- [ ] Implement [Apprise](https://github.com/caronc/apprise) for notifications ([#97](https://github.com/tubearchivist/tubearchivist/issues/97))
 - [ ] User created playlists, random and repeat controls ([#108](https://github.com/tubearchivist/tubearchivist/issues/108), [#220](https://github.com/tubearchivist/tubearchivist/issues/220))
 - [ ] Auto play or play next link ([#226](https://github.com/tubearchivist/tubearchivist/issues/226))
 - [ ] Multi language support
@@ -154,6 +150,7 @@ We have come far, nonetheless we are not short of ideas on how to improve and ex
 - [ ] Custom searchable notes to videos, channels, playlists ([#144](https://github.com/tubearchivist/tubearchivist/issues/144))
 
 Implemented:
+- [X] Implement [Apprise](https://github.com/caronc/apprise) for notifications [2023-08-05]
 - [X] Download video comments [2022-11-30]
 - [X] Show similar videos on video page [2022-11-30]
 - [X] Implement complete offline media file import from json file [2022-08-20]
