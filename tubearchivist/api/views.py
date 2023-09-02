@@ -1,7 +1,12 @@
 """all API views"""
 
+from api.src.aggs import BiggestChannel, DownloadHist, Primary, WatchProgress
 from api.src.search_processor import SearchProcess
 from home.src.download.queue import PendingInteract
+from home.src.download.subscriptions import (
+    ChannelSubscription,
+    PlaylistSubscription,
+)
 from home.src.download.yt_dlp_base import CookieHandler
 from home.src.es.connect import ElasticWrap
 from home.src.es.snapshot import ElasticSnapshot
@@ -9,6 +14,7 @@ from home.src.frontend.searching import SearchForm
 from home.src.frontend.watched import WatchState
 from home.src.index.channel import YoutubeChannel
 from home.src.index.generic import Pagination
+from home.src.index.playlist import YoutubePlaylist
 from home.src.index.reindex import ReindexProgress
 from home.src.index.video import SponsorBlock, YoutubeVideo
 from home.src.ta.config import AppConfig, ReleaseVersion
@@ -223,6 +229,10 @@ class VideoSponsorView(ApiBaseView):
         # pylint: disable=unused-argument
 
         self.get_document(video_id)
+        if not self.response.get("data"):
+            message = {"message": "video not found"}
+            return Response(message, status=404)
+
         sponsorblock = self.response["data"].get("sponsorblock")
 
         return Response(sponsorblock)
@@ -318,9 +328,8 @@ class ChannelApiListView(ApiBaseView):
 
         return Response(self.response)
 
-    @staticmethod
-    def post(request):
-        """subscribe to list of channels"""
+    def post(self, request):
+        """subscribe/unsubscribe to list of channels"""
         data = request.data
         try:
             to_add = data["data"]
@@ -329,11 +338,57 @@ class ChannelApiListView(ApiBaseView):
             print(message)
             return Response({"message": message}, status=400)
 
-        pending = [i["channel_id"] for i in to_add if i["channel_subscribed"]]
-        url_str = " ".join(pending)
-        subscribe_to.delay(url_str)
+        pending = []
+        for channel_item in to_add:
+            channel_id = channel_item["channel_id"]
+            if channel_item["channel_subscribed"]:
+                pending.append(channel_id)
+            else:
+                self._unsubscribe(channel_id)
+
+        if pending:
+            url_str = " ".join(pending)
+            subscribe_to.delay(url_str, expected_type="channel")
 
         return Response(data)
+
+    @staticmethod
+    def _unsubscribe(channel_id: str):
+        """unsubscribe"""
+        print(f"[{channel_id}] unsubscribe from channel")
+        ChannelSubscription().change_subscribe(
+            channel_id, channel_subscribed=False
+        )
+
+
+class ChannelApiSearchView(ApiBaseView):
+    """resolves to /api/channel/search/
+    search for channel
+    """
+
+    search_base = "ta_channel/_doc/"
+
+    def get(self, request):
+        """handle get request, search with s parameter"""
+
+        query = request.GET.get("q")
+        if not query:
+            message = "missing expected q parameter"
+            return Response({"message": message, "data": False}, status=400)
+
+        try:
+            parsed = Parser(query).parse()[0]
+        except (ValueError, IndexError, AttributeError):
+            message = f"channel not found: {query}"
+            return Response({"message": message, "data": False}, status=404)
+
+        if not parsed["type"] == "channel":
+            message = "expected type channel"
+            return Response({"message": message, "data": False}, status=400)
+
+        self.get_document(parsed["url"])
+
+        return Response(self.response, status=self.status_code)
 
 
 class ChannelApiVideoView(ApiBaseView):
@@ -373,6 +428,38 @@ class PlaylistApiListView(ApiBaseView):
         self.get_document_list(request)
         return Response(self.response)
 
+    def post(self, request):
+        """subscribe/unsubscribe to list of playlists"""
+        data = request.data
+        try:
+            to_add = data["data"]
+        except KeyError:
+            message = "missing expected data key"
+            print(message)
+            return Response({"message": message}, status=400)
+
+        pending = []
+        for playlist_item in to_add:
+            playlist_id = playlist_item["playlist_id"]
+            if playlist_item["playlist_subscribed"]:
+                pending.append(playlist_id)
+            else:
+                self._unsubscribe(playlist_id)
+
+        if pending:
+            url_str = " ".join(pending)
+            subscribe_to.delay(url_str, expected_type="playlist")
+
+        return Response(data)
+
+    @staticmethod
+    def _unsubscribe(playlist_id: str):
+        """unsubscribe"""
+        print(f"[{playlist_id}] unsubscribe from playlist")
+        PlaylistSubscription().change_subscribe(
+            playlist_id, subscribe_status=False
+        )
+
 
 class PlaylistApiView(ApiBaseView):
     """resolves to /api/playlist/<playlist_id>/
@@ -386,6 +473,17 @@ class PlaylistApiView(ApiBaseView):
         """get request"""
         self.get_document(playlist_id)
         return Response(self.response, status=self.status_code)
+
+    def delete(self, request, playlist_id):
+        """delete playlist"""
+        print(f"{playlist_id}: delete playlist")
+        delete_videos = request.GET.get("delete-videos", False)
+        if delete_videos:
+            YoutubePlaylist(playlist_id).delete_videos_playlist()
+        else:
+            YoutubePlaylist(playlist_id).delete_metadata()
+
+        return Response({"success": True})
 
 
 class PlaylistApiVideoView(ApiBaseView):
@@ -878,3 +976,58 @@ class NotificationView(ApiBaseView):
             query = f"{query}:{filter_by}"
 
         return Response(RedisArchivist().list_items(query))
+
+
+class StatPrimaryView(ApiBaseView):
+    """resolves to /api/stats/primary/
+    GET: return document count
+    """
+
+    def get(self, request):
+        """get stats"""
+        # pylint: disable=unused-argument
+
+        return Response(Primary().process())
+
+
+class StatWatchProgress(ApiBaseView):
+    """resolves to /api/stats/watchprogress/
+    GET: return watch/unwatch progress stats
+    """
+
+    def get(self, request):
+        """handle get request"""
+        # pylint: disable=unused-argument
+
+        return Response(WatchProgress().process())
+
+
+class StatDownloadHist(ApiBaseView):
+    """resolves to /api/stats/downloadhist/
+    GET: return download video count histogram for last days
+    """
+
+    def get(self, request):
+        """handle get request"""
+        # pylint: disable=unused-argument
+
+        return Response(DownloadHist().process())
+
+
+class StatBiggestChannel(ApiBaseView):
+    """resolves to /api/stats/biggestchannels/
+    GET: return biggest channels
+    param: order
+    """
+
+    order_choices = ["doc_count", "duration", "media_size"]
+
+    def get(self, request):
+        """handle get request"""
+
+        order = request.GET.get("order", False)
+        if order and order not in self.order_choices:
+            message = {"message": f"invalid order parameter {order}"}
+            return Response(message, status=400)
+
+        return Response(BiggestChannel().process())

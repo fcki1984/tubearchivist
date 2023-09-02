@@ -6,7 +6,7 @@
     <div class="channel-banner">
         <a href="{% url 'channel_id' channel_info.channel_id %}"><img src="{{ channel_info.channel_banner_url }}" alt="channel_banner"></a>
     </div>
-    <div class="info-box-item channel-nav">
+    <div class="info-box-item child-page-nav">
         <a href="{% url 'channel_id' channel_info.channel_id %}"><h3>Videos</h3></a>
         {% if has_streams %}
             <a href="{% url 'channel_id_live' channel_info.channel_id %}"><h3>Streams</h3></a>
@@ -54,9 +54,9 @@
                     <a href="{% url 'playlist_id' playlist.source.playlist_id %}"><h2>{{ playlist.source.playlist_name }}</h2></a>
                     <p>Last refreshed: {{ playlist.source.playlist_last_refresh }}</p>
                     {% if playlist.source.playlist_subscribed %}
-                        <button class="unsubscribe" type="button" id="{{ playlist.source.playlist_id }}" onclick="unsubscribe(this.id)" title="Unsubscribe from {{ playlist.source.playlist_name }}">Unsubscribe</button>
+                        <button class="unsubscribe" type="button" data-type="playlist" data-subscribe="" data-id="{{ playlist.source.playlist_id }}" onclick="subscribeStatus(this)" title="Unsubscribe from {{ playlist.source.playlist_name }}">Unsubscribe</button>
                     {% else %}
-                        <button type="button" id="{{ playlist.source.playlist_id }}" onclick="subscribe(this.id)" title="Subscribe to {{ playlist.source.playlist_name }}">Subscribe</button>
+                        <button type="button" data-type="playlist" data-subscribe="true" data-id="{{ playlist.source.playlist_id }}" onclick="subscribeStatus(this)" title="Subscribe to {{ playlist.source.playlist_name }}">Subscribe</button>
                     {% endif %}
                 </div>
             </div>

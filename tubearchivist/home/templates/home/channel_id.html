@@ -6,7 +6,7 @@
     <div class="channel-banner">
         <a href="/channel/{{ channel_info.channel_id }}/"><img src="/cache/channels/{{ channel_info.channel_id }}_banner.jpg" alt="channel_banner"></a>
     </div>
-    <div class="info-box-item channel-nav">
+    <div class="info-box-item child-page-nav">
         <a href="{% url 'channel_id' channel_info.channel_id %}"><h3>Videos</h3></a>
         {% if has_streams %}
             <a href="{% url 'channel_id_live' channel_info.channel_id %}"><h3>Streams</h3></a>
@@ -38,9 +38,9 @@
                     <p>Subscribers: {{ channel_info.channel_subs|intcomma }}</p>
                 {% endif %}
                 {% if channel_info.channel_subscribed %}
-                    <button class="unsubscribe" type="button" id="{{ channel_info.channel_id }}" onclick="unsubscribe(this.id)" title="Unsubscribe from {{ channel_info.channel_name }}">Unsubscribe</button>
+                    <button class="unsubscribe" type="button" data-type="channel" data-subscribe="" data-id="{{ channel_info.channel_id }}" onclick="subscribeStatus(this)" title="Unsubscribe from {{ channel_info.channel_name }}">Unsubscribe</button>
                 {% else %}
-                    <button type="button" id="{{ channel_info.channel_id }}" onclick="subscribe(this.id)" title="Subscribe to {{ channel_info.channel_name }}">Subscribe</button>
+                    <button type="button" data-type="channel" data-subscribe="true" data-id="{{ channel_info.channel_id }}" onclick="subscribeStatus(this)" title="Subscribe to {{ channel_info.channel_name }}">Subscribe</button>
                 {% endif %}
             </div>
         </div>

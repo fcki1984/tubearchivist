@@ -42,6 +42,11 @@ urlpatterns = [
         name="api-channel-list",
     ),
     path(
+        "channel/search/",
+        views.ChannelApiSearchView.as_view(),
+        name="api-channel-search",
+    ),
+    path(
         "channel/<slug:channel_id>/",
         views.ChannelApiView.as_view(),
         name="api-channel",
@@ -130,5 +135,25 @@ urlpatterns = [
         "notification/",
         views.NotificationView.as_view(),
         name="api-notification",
+    ),
+    path(
+        "stats/primary/",
+        views.StatPrimaryView.as_view(),
+        name="api-stats-primary",
+    ),
+    path(
+        "stats/watch/",
+        views.StatWatchProgress.as_view(),
+        name="api-stats-watch",
+    ),
+    path(
+        "stats/downloadhist/",
+        views.StatDownloadHist.as_view(),
+        name="api-stats-downloadhist",
+    ),
+    path(
+        "stats/biggestchannels/",
+        views.StatBiggestChannel.as_view(),
+        name="api-stats-biggestchannels",
     ),
 ]

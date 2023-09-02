@@ -9,6 +9,7 @@ Welcome, and thanks for showing interest in improving Tube Archivist!
   - [Installation Help](#installation-help)
 - [How to make a Pull Request](#how-to-make-a-pull-request)
 - [Contributions beyond the scope](#contributions-beyond-the-scope)
+- [User Scripts](#user-scripts)
 - [Improve to the Documentation](#improve-to-the-documentation)
 - [Development Environment](#development-environment)
 ---
@@ -105,6 +106,16 @@ Beyond that, general rules to consider:
 
 ---
 
+## User Scripts
+Some of you might have created useful scripts or API integrations around this project. Sharing is caring! Please add a link to your script to the Readme [here](https://github.com/tubearchivist/tubearchivist#user-scripts).
+- Your repo should have a `LICENSE` file with one of the common open source licenses. People are expected to fork, adapt and build upon your great work.
+- Your script should not modify the *official* files of Tube Archivist. E.g. your symlink script should build links *outside* of your `/youtube` folder. Or your fancy script that creates a beautiful artwork gallery should do that *outside* of the `/cache` folder. Modifying the *official* files and folders of TA are probably not supported.
+- On the top of the repo you should have a mention and a link back to the Tube Archivist repo. Clearly state to **not** to open any issues on the main TA repo regarding your script.
+- Example template:
+  - `[<user>/<repo>](https://linktoyourrepo.com)`: A short one line description.
+
+---
+
 ## Improve to the Documentation
 
 The documentation available at [docs.tubearchivist.com](https://docs.tubearchivist.com/) and is build from a separate repo [tubearchivist/docs](https://github.com/tubearchivist/docs). The Readme has additional instructions on how to make changes.
@@ -154,14 +165,15 @@ bin/elasticsearch-service-tokens create elastic/kibana kibana
 
 Example docker compose, use same version as for Elasticsearch:
 ```yml
-kibana:
-  image: docker.elastic.co/kibana/kibana:0.0.0
-  container_name: kibana
-  environment:
-	- "ELASTICSEARCH_HOSTS=http://archivist-es:9200"
-	- "ELASTICSEARCH_SERVICEACCOUNTTOKEN=<your-token-here>"
-  ports:
-	- "5601:5601"
+services:
+  kibana:
+    image: docker.elastic.co/kibana/kibana:0.0.0
+    container_name: kibana
+    environment:
+    - "ELASTICSEARCH_HOSTS=http://archivist-es:9200"
+    - "ELASTICSEARCH_SERVICEACCOUNTTOKEN=<your-token-here>"
+    ports:
+    - "5601:5601"
 ```
 
 If you want to run queries on the Elasticsearch container directly from your host with for example `curl` or something like *postman*, you might want to **publish** the port 9200 instead of just **exposing** it.

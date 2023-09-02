@@ -12,7 +12,6 @@ from home.src.index.channel import YoutubeChannel
 from home.src.index.playlist import YoutubePlaylist
 from home.src.index.video_constants import VideoTypeEnum
 from home.src.ta.config import AppConfig
-from home.src.ta.ta_redis import RedisArchivist
 from home.src.ta.urlparser import Parser
 
 
@@ -197,16 +196,13 @@ class PlaylistSubscription:
             thumb = ThumbManager(playlist_id, item_type="playlist")
             thumb.download_playlist_thumb(url)
 
-            # notify
-            message = {
-                "status": "message:subplaylist",
-                "level": "info",
-                "title": "Subscribing to Playlists",
-                "message": f"Processing {idx + 1} of {len(new_playlists)}",
-            }
-            RedisArchivist().set_message(
-                "message:subplaylist", message=message, expire=True
-            )
+            if self.task:
+                self.task.send_progress(
+                    message_lines=[
+                        f"Processing {idx + 1} of {len(new_playlists)}"
+                    ],
+                    progress=(idx + 1) / len(new_playlists),
+                )
 
     @staticmethod
     def channel_validate(channel_id):
@@ -332,7 +328,7 @@ class SubscriptionHandler:
         self.task = task
         self.to_subscribe = False
 
-    def subscribe(self):
+    def subscribe(self, expected_type=False):
         """subscribe to url_str items"""
         if self.task:
             self.task.send_progress(["Processing form content."])
@@ -343,11 +339,16 @@ class SubscriptionHandler:
             if self.task:
                 self._notify(idx, item, total)
 
-            self.subscribe_type(item)
+            self.subscribe_type(item, expected_type=expected_type)
 
-    def subscribe_type(self, item):
+    def subscribe_type(self, item, expected_type):
         """process single item"""
         if item["type"] == "playlist":
+            if expected_type and expected_type != "playlist":
+                raise TypeError(
+                    f"expected {expected_type} url but got {item.get('type')}"
+                )
+
             PlaylistSubscription().process_url_str([item])
             return
 
@@ -359,6 +360,11 @@ class SubscriptionHandler:
             channel_id = item["url"]
         else:
             raise ValueError("failed to subscribe to: " + item["url"])
+
+        if expected_type and expected_type != "channel":
+            raise TypeError(
+                f"expected {expected_type} url but got {item.get('type')}"
+            )
 
         self._subscribe(channel_id)
 
