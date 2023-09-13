@@ -77,7 +77,7 @@ Take a look at the example [docker-compose.yml](https://github.com/tubearchivist
 ## Update
 Always use the *latest* (the default) or a named semantic version tag for the docker images. The *unstable* tags are only for your testing environment, there might not be an update path for these testing builds. 
 
-You will see the current version number of **Tube Archivist** in the footer of the interface. There is a daily version check task querying tubearchivist.com, notifying you of any new releases in the footer. To take advantage of the latest fixes and improvements, make sure you are running the *latest and greatest*. After updating, check the footer to verify you are running the expected version.  
+You will see the current version number of **Tube Archivist** in the footer of the interface. There is a daily version check task querying tubearchivist.com, notifying you of any new releases in the footer. To update, you need to update the docker images, the method for which will depend on your platform. For example, if you're using `docker-compose`, run `docker-compose pull` and then restart with `docker-compose up -d`. After updating, check the footer to verify you are running the expected version.  
 
   - This project is tested for updates between one or two releases maximum. Further updates back may or may not be supported and you might have to reset your index and configurations to update. Ideally apply new updates at least once per month.  
   - There can be breaking changes between updates, particularly as the application grows, new environment variables or settings might be required for you to set in the your docker-compose file. *Always* check the **release notes**: Any breaking changes will be marked there.  
@@ -140,17 +140,15 @@ We have come far, nonetheless we are not short of ideas on how to improve and ex
 
 - [ ] User roles
 - [ ] Podcast mode to serve channel as mp3
-- [ ] Implement [PyFilesystem](https://github.com/PyFilesystem/pyfilesystem2) for flexible video storage
 - [ ] User created playlists, random and repeat controls ([#108](https://github.com/tubearchivist/tubearchivist/issues/108), [#220](https://github.com/tubearchivist/tubearchivist/issues/220))
 - [ ] Auto play or play next link ([#226](https://github.com/tubearchivist/tubearchivist/issues/226))
 - [ ] Multi language support
 - [ ] Show total video downloaded vs total videos available in channel
-- [ ] Add statistics of index
-- [ ] Download speed schedule ([#198](https://github.com/tubearchivist/tubearchivist/issues/198))
 - [ ] Download or Ignore videos by keyword ([#163](https://github.com/tubearchivist/tubearchivist/issues/163))
 - [ ] Custom searchable notes to videos, channels, playlists ([#144](https://github.com/tubearchivist/tubearchivist/issues/144))
 
 Implemented:
+- [X] Add statistics of index [2023-09-03]
 - [X] Implement [Apprise](https://github.com/caronc/apprise) for notifications [2023-08-05]
 - [X] Download video comments [2022-11-30]
 - [X] Show similar videos on video page [2022-11-30]
