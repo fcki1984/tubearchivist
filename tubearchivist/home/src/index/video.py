@@ -18,6 +18,7 @@ from home.src.index.subtitle import YoutubeSubtitle
 from home.src.index.video_constants import VideoTypeEnum
 from home.src.index.video_streams import MediaStreamExtractor
 from home.src.ta.helper import get_duration_sec, get_duration_str, randomizor
+from home.src.ta.settings import EnvironmentSettings
 from home.src.ta.users import UserConfig
 from ryd_client import ryd_client
 
@@ -187,11 +188,11 @@ class YoutubeVideo(YouTubeItem, YoutubeSubtitle):
         # build json_data basics
         self.json_data = {
             "title": self.youtube_meta["title"],
-            "description": self.youtube_meta["description"],
-            "category": self.youtube_meta["categories"],
+            "description": self.youtube_meta.get("description", ""),
+            "category": self.youtube_meta.get("categories", []),
             "vid_thumb_url": self.youtube_meta["thumbnail"],
             "vid_thumb_base64": base64_blur,
-            "tags": self.youtube_meta["tags"],
+            "tags": self.youtube_meta.get("tags", []),
             "published": published,
             "vid_last_refresh": last_refresh,
             "date_downloaded": last_refresh,
@@ -209,31 +210,24 @@ class YoutubeVideo(YouTubeItem, YoutubeSubtitle):
 
     def _add_stats(self):
         """add stats dicst to json_data"""
-        # likes
-        like_count = self.youtube_meta.get("like_count", 0)
-        dislike_count = self.youtube_meta.get("dislike_count", 0)
-        average_rating = self.youtube_meta.get("average_rating", 0)
-        self.json_data.update(
-            {
-                "stats": {
-                    "view_count": self.youtube_meta["view_count"],
-                    "like_count": like_count,
-                    "dislike_count": dislike_count,
-                    "average_rating": average_rating,
-                }
-            }
-        )
+        stats = {
+            "view_count": self.youtube_meta.get("view_count", 0),
+            "like_count": self.youtube_meta.get("like_count", 0),
+            "dislike_count": self.youtube_meta.get("dislike_count", 0),
+            "average_rating": self.youtube_meta.get("average_rating", 0),
+        }
+        self.json_data.update({"stats": stats})
 
     def build_dl_cache_path(self):
         """find video path in dl cache"""
-        cache_dir = self.app_conf["cache_dir"]
+        cache_dir = EnvironmentSettings.CACHE_DIR
         video_id = self.json_data["youtube_id"]
         cache_path = f"{cache_dir}/download/{video_id}.mp4"
         if os.path.exists(cache_path):
             return cache_path
 
         channel_path = os.path.join(
-            self.app_conf["videos"],
+            EnvironmentSettings.MEDIA_DIR,
             self.json_data["channel"]["channel_id"],
             f"{video_id}.mp4",
         )
@@ -282,7 +276,7 @@ class YoutubeVideo(YouTubeItem, YoutubeSubtitle):
         if not self.json_data:
             raise FileNotFoundError
 
-        video_base = self.app_conf["videos"]
+        video_base = EnvironmentSettings.MEDIA_DIR
         media_url = self.json_data.get("media_url")
         file_path = os.path.join(video_base, media_url)
         try:

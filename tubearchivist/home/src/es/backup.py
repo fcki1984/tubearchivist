@@ -13,16 +13,18 @@ from datetime import datetime
 from home.src.es.connect import ElasticWrap, IndexPaginate
 from home.src.ta.config import AppConfig
 from home.src.ta.helper import get_mapping, ignore_filelist
+from home.src.ta.settings import EnvironmentSettings
 
 
 class ElasticBackup:
     """dump index to nd-json files for later bulk import"""
 
     INDEX_SPLIT = ["comment"]
+    CACHE_DIR = EnvironmentSettings.CACHE_DIR
+    BACKUP_DIR = os.path.join(CACHE_DIR, "backup")
 
     def __init__(self, reason=False, task=False):
         self.config = AppConfig().config
-        self.cache_dir = self.config["application"]["cache_dir"]
         self.timestamp = datetime.now().strftime("%Y%m%d")
         self.index_config = get_mapping()
         self.reason = reason
@@ -78,14 +80,13 @@ class ElasticBackup:
     def zip_it(self):
         """pack it up into single zip file"""
         file_name = f"ta_backup-{self.timestamp}-{self.reason}.zip"
-        folder = os.path.join(self.cache_dir, "backup")
 
         to_backup = []
-        for file in os.listdir(folder):
+        for file in os.listdir(self.BACKUP_DIR):
             if file.endswith(".json"):
-                to_backup.append(os.path.join(folder, file))
+                to_backup.append(os.path.join(self.BACKUP_DIR, file))
 
-        backup_file = os.path.join(folder, file_name)
+        backup_file = os.path.join(self.BACKUP_DIR, file_name)
 
         comp = zipfile.ZIP_DEFLATED
         with zipfile.ZipFile(backup_file, "w", compression=comp) as zip_f:
@@ -98,7 +99,7 @@ class ElasticBackup:
 
     def post_bulk_restore(self, file_name):
         """send bulk to es"""
-        file_path = os.path.join(self.cache_dir, file_name)
+        file_path = os.path.join(self.CACHE_DIR, file_name)
         with open(file_path, "r", encoding="utf-8") as f:
             data = f.read()
 
@@ -109,9 +110,7 @@ class ElasticBackup:
 
     def get_all_backup_files(self):
         """build all available backup files for view"""
-        backup_dir = os.path.join(self.cache_dir, "backup")
-        backup_files = os.listdir(backup_dir)
-        all_backup_files = ignore_filelist(backup_files)
+        all_backup_files = ignore_filelist(os.listdir(self.BACKUP_DIR))
         all_available_backups = [
             i
             for i in all_backup_files
@@ -120,23 +119,35 @@ class ElasticBackup:
         all_available_backups.sort(reverse=True)
 
         backup_dicts = []
-        for backup_file in all_available_backups:
-            file_split = backup_file.split("-")
-            if len(file_split) == 2:
-                timestamp = file_split[1].strip(".zip")
-                reason = False
-            elif len(file_split) == 3:
-                timestamp = file_split[1]
-                reason = file_split[2].strip(".zip")
-
-            to_add = {
-                "filename": backup_file,
-                "timestamp": timestamp,
-                "reason": reason,
-            }
-            backup_dicts.append(to_add)
+        for filename in all_available_backups:
+            data = self.build_backup_file_data(filename)
+            backup_dicts.append(data)
 
         return backup_dicts
+
+    def build_backup_file_data(self, filename):
+        """build metadata of single backup file"""
+        file_path = os.path.join(self.BACKUP_DIR, filename)
+        if not os.path.exists(file_path):
+            return False
+
+        file_split = filename.split("-")
+        if len(file_split) == 2:
+            timestamp = file_split[1].strip(".zip")
+            reason = False
+        elif len(file_split) == 3:
+            timestamp = file_split[1]
+            reason = file_split[2].strip(".zip")
+
+        data = {
+            "filename": filename,
+            "file_path": file_path,
+            "file_size": os.path.getsize(file_path),
+            "timestamp": timestamp,
+            "reason": reason,
+        }
+
+        return data
 
     def restore(self, filename):
         """
@@ -148,22 +159,19 @@ class ElasticBackup:
 
     def _unpack_zip_backup(self, filename):
         """extract backup zip and return filelist"""
-        backup_dir = os.path.join(self.cache_dir, "backup")
-        file_path = os.path.join(backup_dir, filename)
+        file_path = os.path.join(self.BACKUP_DIR, filename)
 
         with zipfile.ZipFile(file_path, "r") as z:
             zip_content = z.namelist()
-            z.extractall(backup_dir)
+            z.extractall(self.BACKUP_DIR)
 
         return zip_content
 
     def _restore_json_files(self, zip_content):
         """go through the unpacked files and restore"""
-        backup_dir = os.path.join(self.cache_dir, "backup")
-
         for idx, json_f in enumerate(zip_content):
             self._notify_restore(idx, json_f, len(zip_content))
-            file_name = os.path.join(backup_dir, json_f)
+            file_name = os.path.join(self.BACKUP_DIR, json_f)
 
             if not json_f.startswith("es_") or not json_f.endswith(".json"):
                 os.remove(file_name)
@@ -200,13 +208,21 @@ class ElasticBackup:
             print("no backup files to rotate")
             return
 
-        backup_dir = os.path.join(self.cache_dir, "backup")
-
         all_to_delete = auto[rotate:]
         for to_delete in all_to_delete:
-            file_path = os.path.join(backup_dir, to_delete["filename"])
-            print(f"remove old backup file: {file_path}")
-            os.remove(file_path)
+            self.delete_file(to_delete["filename"])
+
+    def delete_file(self, filename):
+        """delete backup file"""
+        file_path = os.path.join(self.BACKUP_DIR, filename)
+        if not os.path.exists(file_path):
+            print(f"backup file not found: {filename}")
+            return False
+
+        print(f"remove old backup file: {file_path}")
+        os.remove(file_path)
+
+        return file_path
 
 
 class BackupCallback:
@@ -217,6 +233,7 @@ class BackupCallback:
         self.index_name = index_name
         self.counter = counter
         self.timestamp = datetime.now().strftime("%Y%m%d")
+        self.cache_dir = EnvironmentSettings.CACHE_DIR
 
     def run(self):
         """run the junk task"""
@@ -243,9 +260,8 @@ class BackupCallback:
 
     def _write_es_json(self, file_content):
         """write nd-json file for es _bulk API to disk"""
-        cache_dir = AppConfig().config["application"]["cache_dir"]
         index = self.index_name.lstrip("ta_")
         file_name = f"es_{index}-{self.timestamp}-{self.counter}.json"
-        file_path = os.path.join(cache_dir, "backup", file_name)
+        file_path = os.path.join(self.cache_dir, "backup", file_name)
         with open(file_path, "a+", encoding="utf-8") as f:
             f.write(file_content)

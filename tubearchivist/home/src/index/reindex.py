@@ -19,6 +19,7 @@ from home.src.index.comments import Comments
 from home.src.index.playlist import YoutubePlaylist
 from home.src.index.video import YoutubeVideo
 from home.src.ta.config import AppConfig
+from home.src.ta.settings import EnvironmentSettings
 from home.src.ta.ta_redis import RedisQueue
 
 
@@ -104,11 +105,13 @@ class ReindexPopulate(ReindexBase):
         """get total hits from index"""
         index_name = reindex_config["index_name"]
         active_key = reindex_config["active_key"]
-        path = f"{index_name}/_search?filter_path=hits.total"
-        data = {"query": {"match": {active_key: True}}}
-        response, _ = ElasticWrap(path).post(data=data)
-        total_hits = response["hits"]["total"]["value"]
-        return total_hits
+        data = {
+            "query": {"term": {active_key: {"value": True}}},
+            "_source": False,
+        }
+        total = IndexPaginate(index_name, data, keep_source=True).get_results()
+
+        return len(total)
 
     def _get_daily_should(self, total_hits):
         """calc how many should reindex daily"""
@@ -122,7 +125,7 @@ class ReindexPopulate(ReindexBase):
         """get outdated from index_name"""
         index_name = reindex_config["index_name"]
         refresh_key = reindex_config["refresh_key"]
-        now_lte = self.now - self.interval * 24 * 60 * 60
+        now_lte = str(self.now - self.interval * 24 * 60 * 60)
         must_list = [
             {"match": {reindex_config["active_key"]: True}},
             {"range": {refresh_key: {"lte": now_lte}}},
@@ -293,7 +296,7 @@ class Reindex(ReindexBase):
 
         # get new
         media_url = os.path.join(
-            self.config["application"]["videos"], es_meta["media_url"]
+            EnvironmentSettings.MEDIA_DIR, es_meta["media_url"]
         )
         video.build_json(media_path=media_url)
         if not video.youtube_meta:
@@ -311,10 +314,6 @@ class Reindex(ReindexBase):
             video.json_data["playlist"] = es_meta.get("playlist")
 
         video.upload_to_es()
-        if es_meta.get("media_url") != video.json_data["media_url"]:
-            self._rename_media_file(
-                es_meta.get("media_url"), video.json_data["media_url"]
-            )
 
         thumb_handler = ThumbManager(youtube_id)
         thumb_handler.delete_video_thumb()
@@ -324,14 +323,6 @@ class Reindex(ReindexBase):
         self.processed["videos"] += 1
 
         return
-
-    def _rename_media_file(self, media_url_is, media_url_should):
-        """handle title change"""
-        print(f"[reindex] fix media_url {media_url_is} to {media_url_should}")
-        videos = self.config["application"]["videos"]
-        old_path = os.path.join(videos, media_url_is)
-        new_path = os.path.join(videos, media_url_should)
-        os.rename(old_path, new_path)
 
     def _reindex_single_channel(self, channel_id):
         """refresh channel data and sync to videos"""

@@ -10,6 +10,7 @@ from http import cookiejar
 from io import StringIO
 
 import yt_dlp
+from home.src.ta.settings import EnvironmentSettings
 from home.src.ta.ta_redis import RedisArchivist
 
 
@@ -86,6 +87,7 @@ class CookieHandler:
     def __init__(self, config):
         self.cookie_io = False
         self.config = config
+        self.cache_dir = EnvironmentSettings.CACHE_DIR
 
     def get(self):
         """get cookie io stream"""
@@ -95,8 +97,9 @@ class CookieHandler:
 
     def import_cookie(self):
         """import cookie from file"""
-        cache_path = self.config["application"]["cache_dir"]
-        import_path = os.path.join(cache_path, "import", "cookies.google.txt")
+        import_path = os.path.join(
+            self.cache_dir, "import", "cookies.google.txt"
+        )
 
         try:
             with open(import_path, encoding="utf-8") as cookie_file:
@@ -111,7 +114,7 @@ class CookieHandler:
         print("cookie: import successful")
 
     def set_cookie(self, cookie):
-        """set cookie str and activate in cofig"""
+        """set cookie str and activate in config"""
         RedisArchivist().set_message("cookie", cookie, save=True)
         path = ".downloads.cookie_import"
         RedisArchivist().set_message("config", True, path=path, save=True)

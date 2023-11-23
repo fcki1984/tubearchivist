@@ -60,7 +60,7 @@ Take a look at the example [docker-compose.yml](https://github.com/tubearchivist
 | TA_UWSGI_PORT | Overwrite container internal uwsgi port | Optional |
 | TA_ENABLE_AUTH_PROXY | Enables support for forwarding auth in reverse proxies | [Read more](https://docs.tubearchivist.com/configuration/forward-auth/) |
 | TA_AUTH_PROXY_USERNAME_HEADER | Header containing username to log in | Optional |
-| TA_AUTH_PROXY_LOGOUT_URL | Logout URL for forwarded auth | Opttional |
+| TA_AUTH_PROXY_LOGOUT_URL | Logout URL for forwarded auth | Optional |
 | ES_URL | URL That ElasticSearch runs on | Optional |
 | ES_DISABLE_VERIFY_SSL | Disable ElasticSearch SSL certificate verification | Optional |
 | ES_SNAPSHOT_DIR | Custom path where elastic search stores snapshots for master/data nodes | Optional |
@@ -135,6 +135,11 @@ The Elasticsearch index will turn to ***read only*** if the disk usage of the co
 
 Similar to that, TubeArchivist will become all sorts of messed up when running out of disk space. There are some error messages in the logs when that happens, but it's best to make sure to have enough disk space before starting to download.
 
+## `error setting rlimit`
+If you are seeing errors like `failed to create shim: OCI runtime create failed` and `error during container init: error setting rlimits`, this means docker can't set these limits, usually because they are set at another place or are incompatible because of other reasons. Solution is to remove the `ulimits` key from the ES container in your docker compose and start again.
+
+This can happen if you have nested virtualizations, e.g. LXC running Docker in Proxmox.
+
 ## Known limitations
 - Video files created by Tube Archivist need to be playable in your browser of choice. Not every codec is compatible with every browser and might require some testing with format selection. 
 - Every limitation of **yt-dlp** will also be present in Tube Archivist. If **yt-dlp** can't download or extract a video for any reason, Tube Archivist won't be able to either.
@@ -144,6 +149,7 @@ Similar to that, TubeArchivist will become all sorts of messed up when running o
 We have come far, nonetheless we are not short of ideas on how to improve and extend this project. Issues waiting for you to be tackled in no particular order:
 
 - [ ] User roles
+- [ ] Audio download
 - [ ] Podcast mode to serve channel as mp3
 - [ ] User created playlists, random and repeat controls ([#108](https://github.com/tubearchivist/tubearchivist/issues/108), [#220](https://github.com/tubearchivist/tubearchivist/issues/220))
 - [ ] Auto play or play next link ([#226](https://github.com/tubearchivist/tubearchivist/issues/226))
@@ -151,6 +157,9 @@ We have come far, nonetheless we are not short of ideas on how to improve and ex
 - [ ] Show total video downloaded vs total videos available in channel
 - [ ] Download or Ignore videos by keyword ([#163](https://github.com/tubearchivist/tubearchivist/issues/163))
 - [ ] Custom searchable notes to videos, channels, playlists ([#144](https://github.com/tubearchivist/tubearchivist/issues/144))
+- [ ] Search comments
+- [ ] Search download queue
+- [ ] Configure shorts, streams and video sizes per channel
 
 Implemented:
 - [X] Add statistics of index [2023-09-03]

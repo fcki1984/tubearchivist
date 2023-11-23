@@ -2,6 +2,8 @@
 {% block content %}
 {% load static %}
 {% load humanize %}
+{% load auth_extras %}
+
 <div class="boxed-content">
     <div class="channel-banner">
         <a href="/channel/{{ channel_info.channel_id }}/"><img src="/cache/channels/{{ channel_info.channel_id }}_banner.jpg" alt="channel_banner"></a>
@@ -19,7 +21,9 @@
         {% endif %}
         <a href="{% url 'channel_id_about' channel_info.channel_id %}"><h3>About</h3></a>
         {% if has_pending %}
-            <a href="{% url 'downloads' %}?channel={{ channel_info.channel_id }}"><h3>Downloads</h3></a>
+            {% if request.user|has_group:"admin" or request.user.is_staff %}
+                <a href="{% url 'downloads' %}?channel={{ channel_info.channel_id }}"><h3>Downloads</h3></a>
+            {% endif %}
         {% endif %}
     </div>
     <div id="notifications" data="channel reindex"></div>
@@ -38,7 +42,9 @@
                     <p>Subscribers: {{ channel_info.channel_subs|intcomma }}</p>
                 {% endif %}
                 {% if channel_info.channel_subscribed %}
+                    {% if request.user|has_group:"admin" or request.user.is_staff %}
                     <button class="unsubscribe" type="button" data-type="channel" data-subscribe="" data-id="{{ channel_info.channel_id }}" onclick="subscribeStatus(this)" title="Unsubscribe from {{ channel_info.channel_name }}">Unsubscribe</button>
+                    {% endif %}
                 {% else %}
                     <button type="button" data-type="channel" data-subscribe="true" data-id="{{ channel_info.channel_id }}" onclick="subscribeStatus(this)" title="Subscribe to {{ channel_info.channel_name }}">Subscribe</button>
                 {% endif %}
@@ -71,13 +77,15 @@
         <div class="sort">
             <div id="hidden-form">
                 <span>Sort by:</span>
-                <select name="sort" id="sort" onchange="sortChange(this.value)">
+                <select name="sort_by" id="sort" onchange="sortChange(this)">
                     <option value="published" {% if sort_by == "published" %}selected{% endif %}>date published</option>
                     <option value="downloaded" {% if sort_by == "downloaded" %}selected{% endif %}>date downloaded</option>
                     <option value="views" {% if sort_by == "views" %}selected{% endif %}>views</option>
                     <option value="likes" {% if sort_by == "likes" %}selected{% endif %}>likes</option>
+                    <option value="duration" {% if sort_by == "duration" %}selected{% endif %}>duration</option>
+                    <option value="filesize" {% if sort_by == "filesize" %}selected{% endif %}>file size</option>
                 </select>
-                <select name="sord-order" id="sort-order" onchange="sortChange(this.value)">
+                <select name="sort_order" id="sort-order" onchange="sortChange(this)">
                     <option value="asc" {% if sort_order == "asc" %}selected{% endif %}>asc</option>
                     <option value="desc" {% if sort_order == "desc" %}selected{% endif %}>desc</option>
                 </select>

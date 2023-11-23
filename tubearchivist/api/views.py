@@ -1,6 +1,14 @@
 """all API views"""
 
-from api.src.aggs import BiggestChannel, DownloadHist, Primary, WatchProgress
+from api.src.aggs import (
+    BiggestChannel,
+    Channel,
+    Download,
+    DownloadHist,
+    Playlist,
+    Video,
+    WatchProgress,
+)
 from api.src.search_processor import SearchProcess
 from home.src.download.queue import PendingInteract
 from home.src.download.subscriptions import (
@@ -8,6 +16,7 @@ from home.src.download.subscriptions import (
     PlaylistSubscription,
 )
 from home.src.download.yt_dlp_base import CookieHandler
+from home.src.es.backup import ElasticBackup
 from home.src.es.connect import ElasticWrap
 from home.src.es.snapshot import ElasticSnapshot
 from home.src.frontend.searching import SearchForm
@@ -18,38 +27,69 @@ from home.src.index.playlist import YoutubePlaylist
 from home.src.index.reindex import ReindexProgress
 from home.src.index.video import SponsorBlock, YoutubeVideo
 from home.src.ta.config import AppConfig, ReleaseVersion
+from home.src.ta.settings import EnvironmentSettings
 from home.src.ta.ta_redis import RedisArchivist
 from home.src.ta.task_manager import TaskCommand, TaskManager
 from home.src.ta.urlparser import Parser
+from home.src.ta.users import UserConfig
 from home.tasks import (
     BaseTask,
     check_reindex,
     download_pending,
     extrac_dl,
+    run_restore_backup,
     subscribe_to,
 )
+from rest_framework import permissions
 from rest_framework.authentication import (
     SessionAuthentication,
     TokenAuthentication,
 )
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+
+def check_admin(user):
+    """check for admin permission for restricted views"""
+    return user.is_staff or user.groups.filter(name="admin").exists()
+
+
+class AdminOnly(permissions.BasePermission):
+    """allow only admin"""
+
+    def has_permission(self, request, view):
+        return check_admin(request.user)
+
+
+class AdminWriteOnly(permissions.BasePermission):
+    """allow only admin writes"""
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return permissions.IsAuthenticated().has_permission(request, view)
+
+        return check_admin(request.user)
 
 
 class ApiBaseView(APIView):
     """base view to inherit from"""
 
     authentication_classes = [SessionAuthentication, TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
     search_base = ""
     data = ""
 
     def __init__(self):
         super().__init__()
-        self.response = {"data": False, "config": AppConfig().config}
+        self.response = {
+            "data": False,
+            "config": {
+                "enable_cast": EnvironmentSettings.ENABLE_CAST,
+                "downloads": AppConfig().config["downloads"],
+            },
+        }
         self.data = {"query": {"match_all": {}}}
         self.status_code = False
         self.context = False
@@ -102,6 +142,7 @@ class VideoApiView(ApiBaseView):
     """
 
     search_base = "ta_video/_doc/"
+    permission_classes = [AdminWriteOnly]
 
     def get(self, request, video_id):
         # pylint: disable=unused-argument
@@ -165,7 +206,6 @@ class VideoProgressView(ApiBaseView):
         message = {"position": position, "youtube_id": video_id}
         RedisArchivist().set_message(key, message)
         self.response = request.data
-
         return Response(self.response)
 
     def delete(self, request, video_id):
@@ -276,6 +316,7 @@ class ChannelApiView(ApiBaseView):
     """
 
     search_base = "ta_channel/_doc/"
+    permission_classes = [AdminWriteOnly]
 
     def get(self, request, channel_id):
         # pylint: disable=unused-argument
@@ -306,6 +347,7 @@ class ChannelApiListView(ApiBaseView):
 
     search_base = "ta_channel/_search/"
     valid_filter = ["subscribed"]
+    permission_classes = [AdminWriteOnly]
 
     def get(self, request):
         """get request"""
@@ -419,6 +461,7 @@ class PlaylistApiListView(ApiBaseView):
     """
 
     search_base = "ta_playlist/_search/"
+    permission_classes = [AdminWriteOnly]
 
     def get(self, request):
         """handle get request"""
@@ -467,6 +510,7 @@ class PlaylistApiView(ApiBaseView):
     """
 
     search_base = "ta_playlist/_doc/"
+    permission_classes = [AdminWriteOnly]
 
     def get(self, request, playlist_id):
         # pylint: disable=unused-argument
@@ -513,6 +557,7 @@ class DownloadApiView(ApiBaseView):
 
     search_base = "ta_download/_doc/"
     valid_status = ["pending", "ignore", "priority"]
+    permission_classes = [AdminOnly]
 
     def get(self, request, video_id):
         # pylint: disable=unused-argument
@@ -559,6 +604,7 @@ class DownloadApiListView(ApiBaseView):
 
     search_base = "ta_download/_search/"
     valid_filter = ["pending", "ignore"]
+    permission_classes = [AdminOnly]
 
     def get(self, request):
         """get request"""
@@ -663,9 +709,11 @@ class LoginApiView(ObtainAuthToken):
 
 class SnapshotApiListView(ApiBaseView):
     """resolves to /api/snapshot/
-    GET: returns snashot config plus list of existing snapshots
+    GET: returns snapshot config plus list of existing snapshots
     POST: take snapshot now
     """
+
+    permission_classes = [AdminOnly]
 
     @staticmethod
     def get(request):
@@ -690,6 +738,8 @@ class SnapshotApiView(ApiBaseView):
     POST: restore snapshot
     DELETE: delete a snapshot
     """
+
+    permission_classes = [AdminOnly]
 
     @staticmethod
     def get(request, snapshot_id):
@@ -725,10 +775,86 @@ class SnapshotApiView(ApiBaseView):
         return Response(response)
 
 
+class BackupApiListView(ApiBaseView):
+    """resolves to /api/backup/
+    GET: returns list of available zip backups
+    POST: take zip backup now
+    """
+
+    permission_classes = [AdminOnly]
+    task_name = "run_backup"
+
+    @staticmethod
+    def get(request):
+        """handle get request"""
+        # pylint: disable=unused-argument
+        backup_files = ElasticBackup().get_all_backup_files()
+        return Response(backup_files)
+
+    def post(self, request):
+        """handle post request"""
+        # pylint: disable=unused-argument
+        response = TaskCommand().start(self.task_name)
+        message = {
+            "message": "backup task started",
+            "task_id": response["task_id"],
+        }
+
+        return Response(message)
+
+
+class BackupApiView(ApiBaseView):
+    """resolves to /api/backup/<filename>/
+    GET: return a single backup
+    POST: restore backup
+    DELETE: delete backup
+    """
+
+    permission_classes = [AdminOnly]
+    task_name = "restore_backup"
+
+    @staticmethod
+    def get(request, filename):
+        """get single backup"""
+        # pylint: disable=unused-argument
+        backup_file = ElasticBackup().build_backup_file_data(filename)
+        if not backup_file:
+            message = {"message": "file not found"}
+            return Response(message, status=404)
+
+        return Response(backup_file)
+
+    def post(self, request, filename):
+        """restore backup file"""
+        # pylint: disable=unused-argument
+        task = run_restore_backup.delay(filename)
+        message = {
+            "message": "backup restore task started",
+            "filename": filename,
+            "task_id": task.id,
+        }
+        return Response(message)
+
+    @staticmethod
+    def delete(request, filename):
+        """delete backup file"""
+        # pylint: disable=unused-argument
+
+        backup_file = ElasticBackup().delete_file(filename)
+        if not backup_file:
+            message = {"message": "file not found"}
+            return Response(message, status=404)
+
+        message = {"message": f"file {filename} deleted"}
+        return Response(message)
+
+
 class TaskListView(ApiBaseView):
     """resolves to /api/task-name/
     GET: return a list of all stored task results
     """
+
+    permission_classes = [AdminOnly]
 
     def get(self, request):
         """handle get request"""
@@ -743,6 +869,8 @@ class TaskNameListView(ApiBaseView):
     GET: return a list of stored results of task
     POST: start new background process
     """
+
+    permission_classes = [AdminOnly]
 
     def get(self, request, task_name):
         """handle get request"""
@@ -782,6 +910,7 @@ class TaskIDView(ApiBaseView):
     """
 
     valid_commands = ["stop", "kill"]
+    permission_classes = [AdminOnly]
 
     def get(self, request, task_id):
         """handle get request"""
@@ -833,6 +962,8 @@ class RefreshView(ApiBaseView):
     POST: start a manual refresh task
     """
 
+    permission_classes = [AdminOnly]
+
     def get(self, request):
         """handle get request"""
         request_type = request.GET.get("type")
@@ -859,12 +990,50 @@ class RefreshView(ApiBaseView):
         return Response(data)
 
 
+class UserConfigView(ApiBaseView):
+    """resolves to /api/config/user/
+    GET: return current user config
+    POST: update user config
+    """
+
+    def get(self, request):
+        """get config"""
+        user_id = request.user.id
+        response = UserConfig(user_id).get_config()
+        response.update({"user_id": user_id})
+
+        return Response(response)
+
+    def post(self, request):
+        """update config"""
+        user_id = request.user.id
+        data = request.data
+
+        user_conf = UserConfig(user_id)
+        for key, value in data.items():
+            try:
+                user_conf.set_value(key, value)
+            except ValueError as err:
+                message = {
+                    "status": "Bad Request",
+                    "message": f"failed updating {key} to '{value}', {err}",
+                }
+                return Response(message, status=400)
+
+        response = user_conf.get_config()
+        response.update({"user_id": user_id})
+
+        return Response(response)
+
+
 class CookieView(ApiBaseView):
     """resolves to /api/cookie/
     GET: check if cookie is enabled
     POST: verify validity of cookie
     PUT: import cookie
     """
+
+    permission_classes = [AdminOnly]
 
     @staticmethod
     def get(request):
@@ -953,6 +1122,8 @@ class TokenView(ApiBaseView):
     DELETE: revoke the token
     """
 
+    permission_classes = [AdminOnly]
+
     @staticmethod
     def delete(request):
         print("revoke API token")
@@ -978,16 +1149,52 @@ class NotificationView(ApiBaseView):
         return Response(RedisArchivist().list_items(query))
 
 
-class StatPrimaryView(ApiBaseView):
-    """resolves to /api/stats/primary/
-    GET: return document count
+class StatVideoView(ApiBaseView):
+    """resolves to /api/stats/video/
+    GET: return video stats
     """
 
     def get(self, request):
         """get stats"""
         # pylint: disable=unused-argument
 
-        return Response(Primary().process())
+        return Response(Video().process())
+
+
+class StatChannelView(ApiBaseView):
+    """resolves to /api/stats/channel/
+    GET: return channel stats
+    """
+
+    def get(self, request):
+        """get stats"""
+        # pylint: disable=unused-argument
+
+        return Response(Channel().process())
+
+
+class StatPlaylistView(ApiBaseView):
+    """resolves to /api/stats/playlist/
+    GET: return playlist stats
+    """
+
+    def get(self, request):
+        """get stats"""
+        # pylint: disable=unused-argument
+
+        return Response(Playlist().process())
+
+
+class StatDownloadView(ApiBaseView):
+    """resolves to /api/stats/download/
+    GET: return download stats
+    """
+
+    def get(self, request):
+        """get stats"""
+        # pylint: disable=unused-argument
+
+        return Response(Download().process())
 
 
 class StatWatchProgress(ApiBaseView):

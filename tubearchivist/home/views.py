@@ -4,23 +4,24 @@ Functionality:
 - holds base classes to inherit from
 """
 import enum
-import json
 import urllib.parse
 from time import sleep
 
 from api.src.search_processor import SearchProcess, process_aggs
+from api.views import check_admin
 from django.conf import settings
 from django.contrib.auth import login
+from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
-from django.http import Http404, JsonResponse
+from django.http import Http404
 from django.shortcuts import redirect, render
+from django.utils.decorators import method_decorator
 from django.views import View
 from home.src.download.queue import PendingInteract
 from home.src.download.yt_dlp_base import CookieHandler
 from home.src.es.backup import ElasticBackup
 from home.src.es.connect import ElasticWrap
 from home.src.es.snapshot import ElasticSnapshot
-from home.src.frontend.api_calls import PostData
 from home.src.frontend.forms import (
     AddToQueueForm,
     ApplicationSettingsForm,
@@ -38,7 +39,8 @@ from home.src.index.playlist import YoutubePlaylist
 from home.src.index.reindex import ReindexProgress
 from home.src.index.video_constants import VideoTypeEnum
 from home.src.ta.config import AppConfig, ReleaseVersion, ScheduleBuilder
-from home.src.ta.helper import time_parser
+from home.src.ta.helper import check_stylesheet, time_parser
+from home.src.ta.settings import EnvironmentSettings
 from home.src.ta.ta_redis import RedisArchivist
 from home.src.ta.users import UserConfig
 from home.tasks import index_channel_playlists, subscribe_to
@@ -53,7 +55,6 @@ class ArchivistViewConfig(View):
         self.view_origin = view_origin
         self.user_id = False
         self.user_conf: UserConfig = False
-        self.default_conf = False
         self.context = False
 
     def get_all_view_styles(self):
@@ -70,11 +71,12 @@ class ArchivistViewConfig(View):
         """build default context for every view"""
         self.user_id = user_id
         self.user_conf = UserConfig(self.user_id)
-        self.default_conf = AppConfig().config
 
         self.context = {
-            "colors": self.user_conf.get_value("colors"),
-            "cast": self.default_conf["application"]["enable_cast"],
+            "stylesheet": check_stylesheet(
+                self.user_conf.get_value("stylesheet")
+            ),
+            "cast": EnvironmentSettings.ENABLE_CAST,
             "sort_by": self.user_conf.get_value("sort_by"),
             "sort_order": self.user_conf.get_value("sort_order"),
             "view_style": self.user_conf.get_value(
@@ -109,6 +111,8 @@ class ArchivistResultsView(ArchivistViewConfig):
             "likes": "stats.like_count",
             "downloaded": "date_downloaded",
             "published": "published",
+            "duration": "player.duration",
+            "filesize": "media_size",
         }
         sort_by = sort_by_map[self.context["sort_by"]]
 
@@ -144,8 +148,7 @@ class ArchivistResultsView(ArchivistViewConfig):
         self.context["continue_vids"] = self.get_in_progress(results)
 
         in_progress = {i["youtube_id"]: i["position"] for i in results}
-        for hit in self.context["results"]:
-            video = hit["source"]
+        for video in self.context["results"]:
             if video["youtube_id"] in in_progress:
                 played_sec = in_progress.get(video["youtube_id"])
                 total = video["player"]["duration"]
@@ -221,7 +224,9 @@ class MinView(View):
     def get_min_context(request):
         """build minimal vars for context"""
         return {
-            "colors": UserConfig(request.user.id).get_value("colors"),
+            "stylesheet": check_stylesheet(
+                UserConfig(request.user.id).get_value("stylesheet")
+            ),
             "version": settings.TA_VERSION,
             "ta_update": ReleaseVersion().get_update(),
         }
@@ -318,6 +323,7 @@ class AboutView(MinView):
         return render(request, "home/about.html", context)
 
 
+@method_decorator(user_passes_test(check_admin), name="dispatch")
 class DownloadView(ArchivistResultsView):
     """resolves to /download/
     handle the download queue
@@ -598,6 +604,7 @@ class ChannelIdAboutView(ChannelIdBaseView):
 
         return render(request, "home/channel_id_about.html", self.context)
 
+    @method_decorator(user_passes_test(check_admin), name="dispatch")
     @staticmethod
     def post(request, channel_id):
         """handle post request"""
@@ -682,6 +689,7 @@ class ChannelView(ArchivistResultsView):
                 "term": {"channel_subscribed": {"value": True}}
             }
 
+    @method_decorator(user_passes_test(check_admin), name="dispatch")
     @staticmethod
     def post(request):
         """handle http post requests"""
@@ -825,6 +833,7 @@ class PlaylistView(ArchivistResultsView):
                 }
             }
 
+    @method_decorator(user_passes_test(check_admin), name="dispatch")
     @staticmethod
     def post(request):
         """handle post from search form"""
@@ -871,7 +880,7 @@ class VideoView(MinView):
                 "video": video_data,
                 "playlist_nav": playlist_nav,
                 "title": video_data.get("title"),
-                "cast": config_handler.config["application"]["enable_cast"],
+                "cast": EnvironmentSettings.ENABLE_CAST,
                 "config": config_handler.config,
                 "position": time_parser(request.GET.get("t")),
                 "reindex": reindex.get("state"),
@@ -974,9 +983,9 @@ class SettingsUserView(MinView):
         config_handler = UserConfig(request.user.id)
         if user_form.is_valid():
             user_form_post = user_form.cleaned_data
-            if user_form_post.get("colors"):
+            if user_form_post.get("stylesheet"):
                 config_handler.set_value(
-                    "colors", user_form_post.get("colors")
+                    "stylesheet", user_form_post.get("stylesheet")
                 )
             if user_form_post.get("page_size"):
                 config_handler.set_value(
@@ -987,6 +996,7 @@ class SettingsUserView(MinView):
         return redirect("settings_user", permanent=True)
 
 
+@method_decorator(user_passes_test(check_admin), name="dispatch")
 class SettingsApplicationView(MinView):
     """resolves to /settings/application/
     handle the settings sub-page for application configuration,
@@ -1076,6 +1086,7 @@ class SettingsApplicationView(MinView):
         RedisArchivist().set_message(key, message=message, expire=True)
 
 
+@method_decorator(user_passes_test(check_admin), name="dispatch")
 class SettingsSchedulingView(MinView):
     """resolves to /settings/scheduling/
     handle the settings sub-page for scheduling settings,
@@ -1109,6 +1120,7 @@ class SettingsSchedulingView(MinView):
         return redirect("settings_scheduling", permanent=True)
 
 
+@method_decorator(user_passes_test(check_admin), name="dispatch")
 class SettingsActionsView(MinView):
     """resolves to /settings/actions/
     handle the settings actions sub-page
@@ -1125,16 +1137,3 @@ class SettingsActionsView(MinView):
         )
 
         return render(request, "home/settings_actions.html", context)
-
-
-def process(request):
-    """handle all the buttons calls via POST ajax"""
-    if request.method == "POST":
-        current_user = request.user.id
-        post_dict = json.loads(request.body.decode())
-        post_handler = PostData(post_dict, current_user)
-        if post_handler.to_exec:
-            task_result = post_handler.run_task()
-            return JsonResponse(task_result)
-
-    return JsonResponse({"success": False})
