@@ -30,6 +30,10 @@ class YoutubeChannel(YouTubeItem):
         self.all_playlists = False
         self.task = task
 
+    def build_yt_url(self):
+        """overwrite base to use channel about page"""
+        return f"{self.yt_base}{self.youtube_id}/about"
+
     def build_json(self, upload=False, fallback=False):
         """get from es or from youtube"""
         self.get_from_es()

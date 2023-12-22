@@ -106,7 +106,10 @@ class AppConfig:
 
             # missing nested values
             for sub_key, sub_value in value.items():
-                if sub_key not in redis_config[key].keys():
+                if (
+                    sub_key not in redis_config[key].keys()
+                    or sub_value == "rand-d"
+                ):
                     if sub_value == "rand-d":
                         sub_value = self._build_rand_daily()
 
@@ -267,7 +270,7 @@ class ReleaseVersion:
     NEW_KEY = "versioncheck:new"
 
     def __init__(self):
-        self.local_version = self._parse_version(settings.TA_VERSION)
+        self.local_version = settings.TA_VERSION
         self.is_unstable = settings.TA_VERSION.endswith("-unstable")
         self.remote_version = False
         self.is_breaking = False
@@ -277,12 +280,12 @@ class ReleaseVersion:
         """check version"""
         print(f"[{self.local_version}]: look for updates")
         self.get_remote_version()
-        new_version, is_breaking = self._has_update()
+        new_version = self._has_update()
         if new_version:
             message = {
                 "status": True,
                 "version": new_version,
-                "is_breaking": is_breaking,
+                "is_breaking": self.is_breaking,
             }
             RedisArchivist().set_message(self.NEW_KEY, message)
             print(f"[{self.local_version}]: found new version {new_version}")
@@ -295,21 +298,20 @@ class ReleaseVersion:
         """read version from remote"""
         sleep(randint(0, 60))
         self.response = requests.get(self.REMOTE_URL, timeout=20).json()
-        remote_version_str = self.response["release_version"]
-        self.remote_version = self._parse_version(remote_version_str)
+        self.remote_version = self.response["release_version"]
         self.is_breaking = self.response["breaking_changes"]
 
     def _has_update(self):
         """check if there is an update"""
-        for idx, number in enumerate(self.local_version):
-            is_newer = self.remote_version[idx] > number
-            if is_newer:
-                return self.response["release_version"], self.is_breaking
+        remote_parsed = self._parse_version(self.remote_version)
+        local_parsed = self._parse_version(self.local_version)
+        if remote_parsed > local_parsed:
+            return self.remote_version
 
-        if self.is_unstable and self.local_version == self.remote_version:
-            return self.response["release_version"], self.is_breaking
+        if self.is_unstable and local_parsed == remote_parsed:
+            return self.remote_version
 
-        return False, False
+        return False
 
     @staticmethod
     def _parse_version(version):
@@ -323,7 +325,10 @@ class ReleaseVersion:
         if not message:
             return False
 
-        if self._parse_version(message.get("version")) == self.local_version:
+        local_parsed = self._parse_version(self.local_version)
+        message_parsed = self._parse_version(message.get("version"))
+
+        if local_parsed >= message_parsed:
             RedisArchivist().del_message(self.NEW_KEY)
             return settings.TA_VERSION
 
@@ -336,3 +341,12 @@ class ReleaseVersion:
             return False
 
         return message
+
+    def clear_fail(self):
+        """clear key, catch previous error in v0.4.5"""
+        message = self.get_update()
+        if not message:
+            return
+
+        if isinstance(message.get("version"), list):
+            RedisArchivist().del_message(self.NEW_KEY)
